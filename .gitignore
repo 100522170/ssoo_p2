@@ -1,0 +1,9 @@
+# Ejecutables finales de la práctica
+uc3mshell
+mycp
+
+# Archivos objeto (compilaciones intermedias generadas por gcc -c)
+*.o
+
+# Archivos de sistema (macOS)
+.DS_Store
