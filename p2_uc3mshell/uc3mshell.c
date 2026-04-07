@@ -92,25 +92,66 @@ int procesar_linea(char *linea) {
   // Finish processing
   for (int i = 0; i < num_comandos; i++) {
 
-    int args_count = tokenizar_linea(comandos[i], " \t\n", argvv, max_args);
-    procesar_redirecciones(argvv);
-
+    tokenizar_linea(comandos[i], " \t\n", argvv, max_args);
     /*********
-      This piece of code prints the command, args, redirections and
-      background.
-      Make the required modifications according to the practice statment.
+    This piece of code prints the command, args, redirections and
+    background.
     **********/
-    printf("Command \"%s\" has %d tokens\n", comandos[i], args_count);
-    for (int arg = 1; arg < max_args; arg++)
-      if (argvv[arg] != NULL)
-        printf("Args = %s\n", argvv[arg]);
 
-    printf("Background = %d\n", background);
-    printf("Redir [IN] = %s\n", filev[0]);
-    printf("Redir [OUT] = %s\n", filev[1]);
-    printf("Redir [ERR] = %s\n", filev[2]);
-    printf("-------\n");
-    /**********************************************************************************************/
+    // If no command then we go
+    if (argvv[0] == NULL)
+      continue;
+
+    //                lines for Mylcalc
+
+    if (strcmp(argvv[0], "mycalc") == 0) {
+      // getting argc
+      int argc_calc = 0;
+      while (argvv[argc_calc] != NULL) {
+        argc_calc++;
+      }
+
+      // we call mycalc
+      mycalc(argc_calc, argvv);
+
+      continue;
+    }
+
+    //                     fork + execvp
+
+    pid_t pid = fork();
+
+    if (pid == -1) {
+      // error in fork, exit.
+      perror("fork");
+      exit(-1);
+    }
+
+    if (pid == 0) {
+
+      //                       Child
+
+      execvp(argvv[0], argvv);
+
+      perror(argvv[0]);
+      exit(-1);
+
+    } else {
+      //                          Father
+
+      if (background == 0) {
+        // waiting for child */
+        waitpid(pid, NULL, 0);
+
+        // Reap zombies
+        while (waitpid(-1, NULL, WNOHANG) > 0)
+          ;
+
+      } else {
+        // printing the Pid no waiting
+        printf("%d", pid);
+      }
+    }
   }
 
   return num_comandos;
