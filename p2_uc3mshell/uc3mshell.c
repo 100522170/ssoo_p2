@@ -72,6 +72,12 @@ void procesar_redirecciones(char *args[]) {
  * NULL value means no redirection. background -- 0 means foreground; 1
  * background.
  */
+/**
+ * This function processes the input command line and returns in global
+ * variables: argvv -- command an args as argv filev -- files for redirections.
+ * NULL value means no redirection. background -- 0 means foreground; 1
+ * background.
+ */
 int procesar_linea(char *linea) {
 
   char *comandos[max_commands];
@@ -89,69 +95,101 @@ int procesar_linea(char *linea) {
   filev[0] = NULL;
   filev[1] = NULL;
   filev[2] = NULL;
+  
+  // Variables para controlar los pipes entre iteraciones
+  int prev_fd = -1; // Guardará el extremo de lectura del pipe anterior
+  int fd[2];        // Descriptores para el pipe actual
+  pid_t last_pid = -1;   // Inicializamos para que el compilador no se queje
   // Finish processing
   for (int i = 0; i < num_comandos; i++) {
 
     tokenizar_linea(comandos[i], " \t\n", argvv, max_args);
-    /*********
-    This piece of code prints the command, args, redirections and
-    background.
-    **********/
 
     // If no command then we go
     if (argvv[0] == NULL)
       continue;
 
-    //                lines for Mylcalc
-
+    // lines for Mylcalc
     if (strcmp(argvv[0], "mycalc") == 0) {
       // getting argc
       int argc_calc = 0;
       while (argvv[argc_calc] != NULL) {
         argc_calc++;
       }
-
       // we call mycalc
       mycalc(argc_calc, argvv);
-
       continue;
     }
 
-    //                     fork + execvp
+    // 1. Crear el pipe si NO es el último comando
+    if (i < num_comandos - 1) {
+        if (pipe(fd) == -1) {
+            perror("pipe");
+            exit(-1); // Salimos si falla la llamada al sistema [cite: 65]
+        }
+    }
 
+    // fork
     pid_t pid = fork();
 
     if (pid == -1) {
       // error in fork, exit.
       perror("fork");
-      exit(-1);
+      exit(-1); // Salimos si falla la llamada al sistema [cite: 65]
     }
 
     if (pid == 0) {
 
-      //                       Child
+      // --- CÓDIGO DEL HIJO ---
+
+      // Si NO es el primer comando, recibe entrada del pipe anterior
+      if (i > 0) {
+          dup2(prev_fd, STDIN_FILENO);
+          close(prev_fd); // Ya está duplicado, cerramos el original
+      }
+
+      // Si NO es el último comando, envía su salida al pipe actual
+      if (i < num_comandos - 1) {
+          close(fd[0]); // El hijo no va a leer de su propio pipe
+          dup2(fd[1], STDOUT_FILENO);
+          close(fd[1]); // Ya está duplicado, cerramos el original
+      }
 
       execvp(argvv[0], argvv);
 
       perror(argvv[0]);
-      exit(-1);
+      exit(-1); // Un error de comando falla, pero el shell sigue (este es el exit del hijo) [cite: 537]
 
     } else {
-      //                          Father
+      // --- CÓDIGO DEL PADRE ---
 
-      if (background == 0) {
-        // waiting for child */
-        waitpid(pid, NULL, 0);
+      last_pid = pid; // Guardamos el PID por si es background
 
-        // Reap zombies
-        while (waitpid(-1, NULL, WNOHANG) > 0)
-          ;
+      // Cerramos el pipe anterior, el padre ya no lo necesita
+      if (i > 0) {
+          close(prev_fd);
+      }
 
-      } else {
-        // printing the Pid no waiting
-        printf("%d", pid);
+      // Preparamos prev_fd para la siguiente iteración
+      if (i < num_comandos - 1) {
+          close(fd[1]); // El padre no va a escribir en este pipe
+          prev_fd = fd[0]; // Guardamos el extremo de lectura para el próximo hijo
       }
     }
+  }
+
+  // 3. Gestión de esperas (Wait y Background)
+  if (background == 0) {
+      // Modo Foreground: Esperar a TODOS los hijos
+      for (int i = 0; i < num_comandos; i++) {
+          wait(NULL);
+      }
+      // Reap zombies
+      while (waitpid(-1, NULL, WNOHANG) > 0);
+
+  } else {
+      // Modo Background: Imprimir el PID sin \n (estrictamente como pide el FAQ) [cite: 564, 565]
+      printf("%d", last_pid);
   }
 
   return num_comandos;
