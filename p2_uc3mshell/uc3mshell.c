@@ -31,7 +31,21 @@ int tokenizar_linea(char *linea, char *delim, char *tokens[], int max_tokens) {
   tokens[i] = NULL;
   return i;
 }
-
+/**
+ * This function removes surrounding double quotes from each argument token.
+ * This handles the special case where echo "Hello world" should produce
+ * the same output as echo Hello world, i.e. the quotes must be stripped.
+ */
+void eliminar_comillas(char *args[]) {
+  for (int i = 0; args[i] != NULL; i++) {
+    int len = strlen(args[i]);
+    // If the token starts and ends with a double quote, strip them in place
+    if (len >= 2 && args[i][0] == '"' && args[i][len - 1] == '"') {
+      args[i][len - 1] = '\0'; // remove trailing quote
+      args[i]++;               // advance pointer past leading quote
+    }
+  }
+}
 /**
  * This function processes the command line to evaluate if there are
  * redirections. If any redirection is detected, the destination file is
@@ -98,6 +112,8 @@ int procesar_linea(char *linea) {
   for (int i = 0; i < num_comandos; i++) {
 
     tokenizar_linea(comandos[i], " \t\n", argvv, max_args);
+    // Remove surrounding double quotes from arguments (e.g. echo "Hello world")
+    eliminar_comillas(argvv);
 
     // Call the function so it fills the array filev
     procesar_redirecciones(argvv);
