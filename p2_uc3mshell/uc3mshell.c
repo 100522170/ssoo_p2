@@ -96,49 +96,49 @@ int procesar_linea(char *linea) {
   filev[1] = NULL;
   filev[2] = NULL;
 
-  // Variables para controlar los pipes entre iteraciones
-  int prev_fd = -1;    // Guardará el extremo de lectura del pipe anterior
-  int fd[2];           // Descriptores para el pipe actual
-  pid_t last_pid = -1; // Inicializamos para que el compilador no se queje
+  // Variables to manage the pipes between iterations
+  int prev_fd = -1;    // Saves the read en of last pipe
+  int fd[2];           // Actual pipe descriptors
+  pid_t last_pid = -1; // We initialice so the compiler does not complain
   // Finish processing
   for (int i = 0; i < num_comandos; i++) {
 
     tokenizar_linea(comandos[i], " \t\n", argvv, max_args);
 
-    // Llamamos a la función para que rellene el array filev
+    // Call the function so it fills the array filev
     procesar_redirecciones(argvv);
     // If no command then we go
     if (argvv[0] == NULL)
       continue;
 
-    // --- INICIO PASO 6: Comando interno exit ---
+    // exit internal command
     if (strcmp(argvv[0], "exit") == 0) {
-      // 1. Comprobar si falta el argumento
+      // 1. Check whether there is an argument
       if (argvv[1] == NULL) {
         fprintf(stderr, "[ERROR] Missing exit code\n");
-        continue; // Pasamos a la siguiente línea del script
+        continue; // Pass to the next line of the script
       }
 
-      // 2. Comprobar si el argumento es un número entero válido
+      // 2. Check whether the number is valid
       char *endptr;
       long val = strtol(argvv[1], &endptr, 10);
 
-      // Si endptr apunta a algo distinto de '\0', significa que hay caracteres
-      // no numéricos
+      // if endptr point to something diferent to '\0', this means there are no
+      // numerical characters
+
       if (*endptr != '\0') {
         fprintf(stderr, "[ERROR] The exit code must be an integer\n");
-        continue; // Pasamos a la siguiente línea del script
+        continue; // Pass to the next line of the script
       }
 
-      // 3. Si es válido: esperar a todos los hijos (background o zombies)
+      // 3. If it is valid, wait for all the sons (background or zombies)
       while (wait(NULL) > 0)
         ;
 
-      // 4. Imprimir el mensaje de despedida y terminar la shell
+      // 4. print the goodbye message and end the shell
       printf("Goodbye %ld\n", val);
       exit((int)val);
     }
-    // --- FIN PASO 6 ---
 
     // lines for Mylcalc
     if (strcmp(argvv[0], "mycalc") == 0) {
@@ -152,11 +152,11 @@ int procesar_linea(char *linea) {
       continue;
     }
 
-    // 1. Crear el pipe si NO es el último comando
+    // 1. Create the pipe if it is not last command
     if (i < num_comandos - 1) {
       if (pipe(fd) == -1) {
         perror("pipe");
-        exit(-1); // Salimos si falla la llamada al sistema [cite: 65]
+        exit(-1); // We exit if the system call fails
       }
     }
 
@@ -166,43 +166,42 @@ int procesar_linea(char *linea) {
     if (pid == -1) {
       // error in fork, exit.
       perror("fork");
-      exit(-1); // Salimos si falla la llamada al sistema [cite: 65]
+      exit(-1); // we exit if the system call fails
     }
 
     if (pid == 0) {
 
-      // --- CÓDIGO DEL HIJO ---
+      // --- Son code ---
 
-      // Si NO es el primer comando, recibe entrada del pipe anterior
+      // If it is NOT the first command, recieves entry of the last pipe
       if (i > 0) {
         dup2(prev_fd, STDIN_FILENO);
-        close(prev_fd); // Ya está duplicado, cerramos el original
+        close(prev_fd); // Its already duplicated, we close the original
       }
 
-      // Si NO es el último comando, envía su salida al pipe actual
+      // If it is NOT the first command, sends its exit to the actual pipe
       if (i < num_comandos - 1) {
-        close(fd[0]); // El hijo no va a leer de su propio pipe
+        close(fd[0]); // son is not going to read from its own pipe
         dup2(fd[1], STDOUT_FILENO);
-        close(fd[1]); // Ya está duplicado, cerramos el original
+        close(fd[1]); // Its already duplicated, we close the original
       }
 
-      // --- REDIRECCIONES DE ARCHIVOS ---
+      // --- Files redirections ---
 
-      // Entrada estándar (<) SOLO en el primer comando
+      // Standart input (<) ONLY on the first command
       if (i == 0 && filev[0] != NULL) {
         int fd_in = open(filev[0], O_RDONLY);
         if (fd_in < 0) {
-          perror(filev[0]); // Si el archivo no existe, da error [cite: 108]
+          perror(filev[0]); // If the files does not exist, raises error
           exit(-1);
         }
         dup2(fd_in, STDIN_FILENO);
         close(fd_in);
       }
 
-      // Salida estándar (>) SOLO en el último comando
+      // Standard output (>) ONLY on the last command
       if (i == num_comandos - 1 && filev[1] != NULL) {
-        // O_CREAT crea si no existe, O_TRUNC lo sobrescribe si ya existe [cite:
-        // 113, 114]
+        // O_CREAT creates if it does not exist, O_TRUNC overwrites
         int fd_out = open(filev[1], O_WRONLY | O_CREAT | O_TRUNC, 0666);
         if (fd_out < 0) {
           perror(filev[1]);
@@ -212,9 +211,9 @@ int procesar_linea(char *linea) {
         close(fd_out);
       }
 
-      // Salida de error (!>) SOLO en el último comando
+      // Standard error (!>) ONLY on the last command
       if (i == num_comandos - 1 && filev[2] != NULL) {
-        // O_CREAT crea si no existe, O_TRUNC lo sobrescribe [cite: 121, 122]
+        // O_CREAT creates if it does not exist, O_TRUNC overwrites
         int fd_err = open(filev[2], O_WRONLY | O_CREAT | O_TRUNC, 0666);
         if (fd_err < 0) {
           perror(filev[2]);
@@ -226,30 +225,30 @@ int procesar_linea(char *linea) {
       execvp(argvv[0], argvv);
 
       perror(argvv[0]);
-      exit(-1); // Un error de comando falla, pero el shell sigue (este es el
-                // exit del hijo) [cite: 537]
+      exit(-1); // A command error fails, but the shell keeps going
+      //  on (this is the son exit)
 
     } else {
-      // --- CÓDIGO DEL PADRE ---
+      // --- Father code ---
 
-      last_pid = pid; // Guardamos el PID por si es background
+      last_pid = pid; // We save the PID in case it is background
 
-      // Cerramos el pipe anterior, el padre ya no lo necesita
+      // We close the last pipe
       if (i > 0) {
         close(prev_fd);
       }
 
-      // Preparamos prev_fd para la siguiente iteración
+      // Prepare prev_fd for the next iteration
       if (i < num_comandos - 1) {
-        close(fd[1]);    // El padre no va a escribir en este pipe
-        prev_fd = fd[0]; // Guardamos el extremo de lectura para el próximo hijo
+        close(fd[1]);    // Father wont overwrite on this pipe
+        prev_fd = fd[0]; // Save the read end for the next son
       }
     }
   }
 
-  // 3. Gestión de esperas (Wait y Background)
+  // 3. Wait management (Wait and Background)
   if (background == 0) {
-    // Modo Foreground: Esperar a TODOS los hijos
+    // Foreground Mode: Wait for all the sons
     for (int i = 0; i < num_comandos; i++) {
       wait(NULL);
     }
@@ -258,8 +257,8 @@ int procesar_linea(char *linea) {
       ;
 
   } else {
-    // Modo Background: Imprimir el PID sin \n (estrictamente como pide el FAQ)
-    // [cite: 564, 565]
+    // Background Mode: Print the PID without \n
+
     printf("%d", last_pid);
   }
 
