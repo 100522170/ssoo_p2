@@ -1,6 +1,6 @@
 ## Uc3mshell P2
-
 ls -l
 echo hola mundo
 pwd
 ls noexiste_este_dir
+exit 0
