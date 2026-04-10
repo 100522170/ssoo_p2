@@ -66,13 +66,7 @@ void procesar_redirecciones(char *args[]) {
     }
 }
 
-/**
- * This function processes the input command line and returns in global
- * variables: argvv -- command an args as argv filev -- files for redirections.
- * NULL value means no redirection. background -- 0 means foreground; 1
- * background.
- */
-/**
+/*
  * This function processes the input command line and returns in global
  * variables: argvv -- command an args as argv filev -- files for redirections.
  * NULL value means no redirection. background -- 0 means foreground; 1
@@ -260,6 +254,7 @@ int procesar_linea(char *linea) {
     // Background Mode: Print the PID without \n
 
     printf("%d", last_pid);
+    fflush(stdout);
   }
 
   return num_comandos;
