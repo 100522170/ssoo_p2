@@ -131,7 +131,7 @@ int procesar_linea(char *linea) {
         continue; // Pass to the next line of the script
       }
 
-      // 3. If it is valid, wait for all the sons (background or zombies)
+      // 3. If it is valid, wait for all the childs (background or zombies)
       while (wait(NULL) > 0)
         ;
 
@@ -171,7 +171,7 @@ int procesar_linea(char *linea) {
 
     if (pid == 0) {
 
-      // --- Son code ---
+      // --- Child code ---
 
       // If it is NOT the first command, recieves entry of the last pipe
       if (i > 0) {
@@ -229,7 +229,7 @@ int procesar_linea(char *linea) {
       //  on (this is the son exit)
 
     } else {
-      // --- Father code ---
+      // --- Parent code ---
 
       last_pid = pid; // We save the PID in case it is background
 
@@ -240,7 +240,7 @@ int procesar_linea(char *linea) {
 
       // Prepare prev_fd for the next iteration
       if (i < num_comandos - 1) {
-        close(fd[1]);    // Father wont overwrite on this pipe
+        close(fd[1]);    // Parent wont overwrite on this pipe
         prev_fd = fd[0]; // Save the read end for the next son
       }
     }
@@ -248,7 +248,7 @@ int procesar_linea(char *linea) {
 
   // 3. Wait management (Wait and Background)
   if (background == 0) {
-    // Foreground Mode: Wait for all the sons
+    // Foreground Mode: Wait for all the childs
     for (int i = 0; i < num_comandos; i++) {
       wait(NULL);
     }
